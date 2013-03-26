@@ -6,7 +6,7 @@
  2013.03.17
  
  put description here etc.
- 
+  
  features to add:
  0. Get rid of Servo.h drive servo with my own method(s). More flexability, cleaner.
  5. Clean some stuff up. Clean up check stall, strip out commented code etc. Could eliminate some global variables: stallValue, pot controlled var.
