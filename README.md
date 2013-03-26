@@ -2,3 +2,28 @@ Arduino
 =======
 
 This is where the Arduino code that drives the SeaGlier is hoasted. Click through to view the code and download the file directly, or download the whole folder as a zip.
+
+Recent improvements include:
+  More reliable operation
+    - The buoyancy engine now only stalls at the dive end of it's stroke. 
+        This eliminates the prolonged, stressful stall at the rise end of the stroke. 
+    - The rise stroke now runs on a timer, stall detection is still running in the background. 
+        If stall is detected before the timer expires the motor will stop. 
+  Improved depth adjustment
+    - The rise stroke is terminated when a timer expires. 
+        This timer can be adjusted by turning the trim pot on the SeaGlide circuit board.
+    - This pot previously controlled the coast time. 
+        Controlling the length of the stroke allows for operation in shallower water. 
+    - The coast time can be adjusted by changing the "pauseTime" variable 
+        in the "Constants" section of the code (at the top).
+  Removed infrared receiver code
+    - Removed the experimental IR receiver code from the program. 
+    - This allows users to program their Arduino boards with SeaGlide code, 
+        without having to import any IR receiver libraries. 
+    - Experimental IR receiver code will be available for the adventurous. 
+    - Eventually this will be refined to accept several different commands from an IR TV remote. 
+  Cleaned things up
+    - Moved the order of methods around, cleaned up some unused code, improved some logic. 
+  Added to and improved comments 
+    - Added comments, improved readability and consistency between comments. 
+    - More comments = more better. Still more to come
