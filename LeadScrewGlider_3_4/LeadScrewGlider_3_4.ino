@@ -1,6 +1,6 @@
 /*
 
- seaGlider with stall detection
+ seaGlide with stall detection
  
  Michael Britt-Crane NSWCCD code 5600
  2013.03.17
@@ -34,10 +34,14 @@
 
 // Constants:
   // Pins
+    const byte servoPin = 10;         // digital pin 10
+    const byte potPin = A3;           // analog pin 3 (d17) center pin on pot, acting as variable volgage devider 
+    const byte motorLoadPin = A2;     // analog pin 2 (d16) 
     const byte ledPin = 13;           // this is attached to an LED on the arduino board, used for debug
-    const byte servoPin = 17;         // A3 (d17)
-    const byte potPin = 1;            // A1 (d15) center pin on pot, acting as variable volgage devider 
-    const byte motorLoadPin = 2;      // A2 (d16) 
+    //old pin definitions
+    //const byte servoPin = 17;         // analog pin 3 (d17)
+    //const byte potPin = A1;           // analog pin 1 (d15) center pin on pot, acting as variable volgage devider 
+    //const byte motorLoadPin = A2;     // analog pin 2 (d16) 
     //const byte diveStopPin = 11;    // not in use. Could be used for dive-end end stop
     //const byte riseStopPin = 12;    // not in use. Could be used for rise-end end stop
     //const byte STAY_ON_PIN =8;      // not in use. Could be used for a latching remote shutoff circuit
@@ -47,14 +51,14 @@
     const byte BLUE_LED = 5;
     const byte LED_BASE = 7;          // this is the comon pin to the 3 LEDs for this LED it is a common anode
   // Other Constants
-    int stallThreshold = 22;  // <<<<<---------------- set the stall sensitivity       
+    int stallThreshold = 29;  // <<<<<---------------- set the stall sensitivity       
     int motorStartTime = 350;         // runs motor for short time before stall detection starts. Avoids detecting startup current surge as stall. Bypasses stickton
-    int pauseTime = 1200;             // 1.2 sec
+    int pauseTime = 2500;             // 2.5 sec
     //int minPause =  1000;           // not in use. This is for if the pause time were controlled by the pot
     //int maxPause = 15000;           // not in use. ""
-    int minDiveTime =  700;           // 700 is a good min ~20cc on 1/4-10 lag bolt 6v
+    int minDiveTime =  9000;          // 700 is a good min ~20cc on 1/4-10 lag bolt 6v
                                       // 800 is a good min ~20cc on 5/16-18 7v
-    int maxDiveTime = 15000;          // 1500 is a good max ~40cc on 1/4-10 lag bolt 6v 
+    int maxDiveTime = 22000;          // 1500 is a good max ~40cc on 1/4-10 lag bolt 6v 
                                       // 1600 is a good max ~42cc on 5/16-18 7v
                               // 11 sec = ~ 30ML on 4AAA W/ 1/4-10 Lag bolt
                               // 13 sec = ~ 35ML at 7.5v W/ 5/16-18 machine screw
@@ -64,7 +68,7 @@
     byte servoRiseCommand = 180;      // this is the angle value that the rise method sends to the servo
 
 // Global Variables
-  //long diveDriveTime  = 13350;    //  <<<<<----------------------- set dive drive time. NOT IN USE V-see below-V
+//  long diveDriveTime  = 16000;    //  <<<<<----------------------- set dive drive time. NOT IN USE V-see below-V
   long diveDriveTime;               // This value is determined by the position of the pot and the min & maxDiveTime vars. it is assigned in the readPot mthod
   int potValue = 0;                 // 10-bit analog reading of voltage on pot pin (0-1023)
   int stallValue = 0;               // the variable that stores the read stall value
@@ -73,38 +77,39 @@
 
 // -------------------------- setup ---------------------------
 void setup() {
-  // debug settup:  
   Serial.begin(9600);                 // start the serial port
-  pinMode(ledPin, OUTPUT);            // the LED on the arduino board used for debuting
-
+//setup input and output pins  
   pinMode(potPin, INPUT);             // set pot pin used to adjust diveDriveTime 
   pinMode(motorLoadPin, INPUT);       // set the stall detection pin as analog input
-
-  // RGB LED setup      
-  pinMode(RED_LED, OUTPUT);     
+  pinMode(ledPin, OUTPUT);            // the LED on the arduino board used for debuting
+  pinMode(servoPin, OUTPUT);      
+  pinMode(RED_LED, OUTPUT);           // RGB LED setup   
   pinMode(GREEN_LED, OUTPUT);     
   pinMode(BLUE_LED, OUTPUT);     
   pinMode(LED_BASE, OUTPUT);     
+//initialize RGB LED
+  ledRGB_Write(0, 0, 0);              // set the R, G, & B LEDs to OFF
   digitalWrite(LED_BASE, HIGH);       // this is the comon pin to the 3 LEDs for this LED it is a common anode, providing +5v to all 3 LEDs
-
+//read and display pot value
   displayPot();                       // Reads the pot and blinks the RGB LED to indicate diveDriveTime setting. Blinks secconds followed by 10ths
-  delay(400);                         //
+  delay(500);                         // wait 0.5 sec
 }
+
 
 // --------------------------- main ---------------------------
 void loop(){
+  ledRGB_Write(0, 200, 0);     // set LED to GREEN to indicate that the glider is rising
+  rise();                      // Rise, Run the "rise" method
+  readPot();
+  ledRGB_Write(0, 0, 255);     // set LED to BLUE to indicate that the glider is coasting in a rise
+  //Serial.println("120");     // NOT IN USE, a debugg marker for data analysis
+  delay(pauseTime);            // pause for pauseTime, coast
+
   ledRGB_Write(255, 0, 0);     // set LED to RED to indicate that the glider is diving
   dive();                      // DIVE! DIVE! DIIVE!!  (run the "dive" method)
   readPot();
-  //Serial.println("120");     // NOT IN USE, a debugg marker for excell
+  //Serial.println("120");     // NOT IN USE, a debugg marker for data analysis
   ledRGB_Write(255, 80, 0);    // set LED to ORANGE to indicate that the glider is coasting in a dive
-  delay(pauseTime);            // pause for pauseTime, coast
-
-  ledRGB_Write(0, 200, 0);     // set LED to GREEN to indicate that the glider is rising
-  rise();                      // Rise  (Run the "rise" method)
-  readPot();
-  ledRGB_Write(0, 0, 255);     // set LED to BLUE to indicate that the glider is coasting in a rise
-  //Serial.println("120");     // NOT IN USE, a debugg marker for excell
   delay(pauseTime);            // pause for pauseTime, coast
 
   //delay(3000);               // NOT IN USE, used for remote shut down testing
@@ -113,77 +118,6 @@ void loop(){
 
 
 // -------------------------- methods -------------------------
-
-void ledRGB_Write(int R, int G, int B){
-  analogWrite(RED_LED, 255-R);                  // These are backwards because you write low values to turn these LEDs on
-  analogWrite(GREEN_LED, 255-G);                // This method reverses the counterintuitive nature of the LEDs
-  analogWrite(BLUE_LED, 255-B);                 // If using common cathode rather than common anode LEDs remove the "255-"es
-}
-
-int readPot(){                                  // this method reads a potentiometer to determine the pause time 
-  byte samples = 10;
-  int potValues = 0;
-  for(int i=0; i<=samples; i++){                // sum a number of readings with 10ms inbetween them
-    potValues += analogRead(potPin);            // reads the value of the potentiometer (value between 0 and 1023) 
-    delay(10);
-  }
-  potValue = potValues / samples;               // take the average value
-  return potValue;
-  //pauseTime = map(potValue, 0, 1023, minPause, maxPause);     // scale the value to the pause range defined by minPause & maxPause 
-  diveDriveTime = map(potValue, 0, 1023, minDiveTime, maxDiveTime); 
-  // scale the value to the diveDriveTime range defined by minDriveTime & maxDriveTime
-}
-
-boolean checkForPotChange(){                    // This method can be used check whether the pot has moved position.
-  int oldPotValue = potValue;                   //   Can be used to display the pot value whenever it is changed or perform whatever other action you like.
-  readPot();                                    // read and set the pot value using readPot
-  if (potValue/20 != oldPotValue/20){           // check whether new pause time is within 20 of old pause time
-    displayPot();                               
-  }
-}
-
-void displayPot(){
-  readPot();                                    // read the potentiometer
-  printPot();                                   // print the read value to the serial port
-  for (int i=0; i < (diveDriveTime/1000); i++){ // flash 1 long pulse for each seccond of pauseTime
-    digitalWrite(ledPin, HIGH);
-    ledRGB_Write(250, 80, 0);
-    Serial.print(i+1);                          // print flash number to console
-    Serial.print(" ");
-    delay(90);
-    digitalWrite(ledPin, LOW);
-    ledRGB_Write(0, 0, 0);
-    delay(450);
-  }
-  Serial.print(" -  ");
-  delay(700);
-  for (int i=40; i < (diveDriveTime%1000); i=i+100){  // flash 1 short pulse for each 1/10 seccond of pauseTime
-    digitalWrite(ledPin, HIGH);
-    ledRGB_Write(240, 0, 0);
-    Serial.print(i/100+1);                      // print flash number to console
-    Serial.print(" ");
-    delay(50);
-    digitalWrite(ledPin, LOW);
-    ledRGB_Write(0, 0, 0);
-    delay(100);
-  }
-  Serial.print("... ");
-  Serial.println("and GO!");
-}
-
-void printPot(){
-  Serial.println();
-  Serial.print("analog reading is: ");
-  Serial.println(potValue, DEC);                // print the potValue to the console
-  Serial.print("the pause time is: ");
-  Serial.print(diveDriveTime/1000, DEC);        // print the pauseTime to the console (secconds)
-  Serial.print(".");                            
-  Serial.print(diveDriveTime%1000/100, DEC);    // print the pauseTime to the console (tenths)
-  Serial.print(diveDriveTime%1000%100/10, DEC); // print the pauseTime to the console (hundredths)
-  Serial.print(" secconds (");
-  Serial.print(diveDriveTime, DEC);             // print the pauseTime to the console (in milli-sec.)
-  Serial.println(")");
-}
 
 void dive(){ 
   checkStall();
@@ -250,7 +184,92 @@ boolean checkStall(){                           // returns true if stall is dete
   }
 }
 
+void ledRGB_Write(int R, int G, int B){
+  analogWrite(RED_LED, 255-R);                  // These are backwards because you write low values to turn these LEDs on
+  analogWrite(GREEN_LED, 255-G);                // This method reverses the counterintuitive nature of the LEDs
+  analogWrite(BLUE_LED, 255-B);                 // If using common cathode rather than common anode LEDs remove the "255-"es
+}
+
+int readPot(){                                  // this method reads a potentiometer to determine the pause time 
+  byte samples = 10;
+  int potValues = 0;
+  for(int i=0; i<=samples; i++){                // sum a number of readings with 10ms inbetween them
+    potValues += analogRead(potPin);            // reads the value of the potentiometer (value between 0 and 1023) 
+    delay(10);
+  }
+  potValue = potValues / samples;               // take the average value
+  //pauseTime = map(potValue, 0, 1023, minPause, maxPause);     // scale the value to the pause range defined by minPause & maxPause 
+  diveDriveTime = map(potValue, 0, 1023, minDiveTime, maxDiveTime); // scale the value to the diveDriveTime range defined by minDriveTime & maxDriveTime
+  return potValue;
+}
+
+void printPot(){
+  Serial.println();
+  Serial.print("analog reading is: ");
+  Serial.println(potValue, DEC);                // print the potValue to the console
+  Serial.print("the pause time is: ");
+  Serial.print(diveDriveTime/1000, DEC);        // print the pauseTime to the console (secconds)
+  Serial.print(".");                            
+  Serial.print(diveDriveTime%1000/100, DEC);    // print the pauseTime to the console (tenths)
+  Serial.print(diveDriveTime%1000%100/10, DEC); // print the pauseTime to the console (hundredths)
+  Serial.print(" secconds (");
+  Serial.print(diveDriveTime, DEC);             // print the pauseTime to the console (in milli-sec.)
+  Serial.println(")");
+}
+
+void displayPot(){                              // could write "flashLED" method to simplify
+  readPot();                                    // read the potentiometer
+  printPot();                                   // print the read value to the serial port
+//print the 10s 
+  for (int i=0; i < (diveDriveTime/10000); i++){ // flash 1 l00ng pulse for each 10 seccond of pauseTime
+    digitalWrite(ledPin, HIGH);
+    ledRGB_Write(0, 254, 0);
+    Serial.print((i+1)*10);                     // print flash number to console
+    Serial.print(" ");
+    delay(250);
+    digitalWrite(ledPin, LOW);
+    ledRGB_Write(0, 0, 0);
+    delay(700);
+  }
+  delay(200);
+  Serial.print(" + ");
+//print the 1s 
+  for (int i=0; i < (diveDriveTime/1000-(diveDriveTime/10000)*10); i++){ // flash 1 long pulse for each seccond of pauseTime
+    digitalWrite(ledPin, HIGH);
+    ledRGB_Write(0, 0, 254);
+    Serial.print(i+1);                          // print flash number to console
+    Serial.print(" ");
+    delay(90);
+    digitalWrite(ledPin, LOW);
+    ledRGB_Write(0, 0, 0);
+    delay(400);
+  }
+  Serial.print(" . ");
+  delay(700);
+//print the 0.1s 
+  for (int i=40; i < (diveDriveTime%1000); i=i+100){  // flash 1 short pulse for each 1/10 seccond of pauseTime
+    digitalWrite(ledPin, HIGH);
+    ledRGB_Write(254, 0, 0);
+    Serial.print(i/100+1);                      // print flash number to console
+    Serial.print(" ");
+    delay(50);
+    digitalWrite(ledPin, LOW);
+    ledRGB_Write(0, 0, 0);
+    delay(100);
+  }
+  Serial.print("... ");
+  Serial.println("and GO!");
+}
+
 // --------------------- methods below this line are not in use --------------------
+
+boolean checkForPotChange(){                    // This method can be used check whether the pot has moved position.
+  int oldPotValue = potValue;                   //   Can be used to display the pot value whenever it is changed or perform whatever other action you like.
+  readPot();                                    // read and set the pot value using readPot
+  if (potValue/20 != oldPotValue/20){           // check whether new pause time is within 20 of old pause time
+    displayPot();                               
+  }
+}
 
 void pauseMethod(){
   myservo.detach();
